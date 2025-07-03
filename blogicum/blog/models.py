@@ -2,6 +2,9 @@ from django.db import models
 from django.contrib.auth import get_user_model
 
 
+User = get_user_model()
+
+
 class BaseModel(models.Model):
     created_at = models.DateTimeField(auto_now_add=True,
                                       verbose_name="Добавлено")
@@ -14,9 +17,6 @@ class BaseModel(models.Model):
 
     class Meta:
         abstract = True
-
-
-User = get_user_model()
 
 
 class Location(BaseModel):
@@ -55,19 +55,20 @@ class Post(BaseModel):
                                     )
     author = models.ForeignKey(User,
                                on_delete=models.CASCADE,
-                               related_name='posts',
+                               related_name="posts",
                                verbose_name="Автор публикации")
     location = models.ForeignKey(Location,
                                  on_delete=models.SET_NULL,
                                  null=True,
-                                 related_name='posts',
-                                 verbose_name='Местоположение')
+                                 related_name="posts",
+                                 verbose_name="Местоположение")
     category = models.ForeignKey(Category,
                                  verbose_name="Категория",
                                  on_delete=models.SET_NULL,
-                                 related_name='posts',
+                                 related_name="posts",
                                  null=True)
 
     class Meta:
         verbose_name = "публикация"
         verbose_name_plural = "Публикации"
+        ordering = ["-pub_date"]

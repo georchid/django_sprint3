@@ -1,51 +1,71 @@
-from django.shortcuts import render, get_object_or_404
+from django.shortcuts import get_object_or_404
 from django.http import Http404
 from .models import Post, Category
 from django.utils import timezone
+from django.views.generic import ListView, DetailView
 
 
-def index(request):
-    template = 'blog/index.html'
-    post_list = Post.objects.select_related(
-        'category'
-    ).filter(
-        is_published=True,
-        category__is_published=True,
-        pub_date__lte=timezone.now()
-    ).order_by('-pub_date')[:5]
+class IndexListView(ListView):
+    model = Post
+    template_name = "blog/index.html"
+    context_object_name = "post_list"
 
-    context = {'post_list': post_list}
-    return render(request, template, context)
-
-
-def post_detail(request, post_id):
-    template = 'blog/detail.html'
-    post = get_object_or_404(Post, pk=post_id)
-    if (
-        post.pub_date > timezone.now()
-        or not post.is_published
-        or not post.category.is_published
-    ):
-        raise Http404("Публикация не найдена или недоступна")
-
-    context = {'post': post}
-    return render(request, template, context)
+    def get_queryset(self):
+        return (
+            Post.objects
+            .select_related("category")
+            .filter(
+                is_published=True,
+                category__is_published=True,
+                pub_date__lte=timezone.now(),
+            )[:5]
+        )
 
 
-def category_posts(request, category_slug):
-    template = 'blog/category.html'
-    category = get_object_or_404(Category, slug=category_slug)
-    if not category.is_published:
-        raise Http404("Категория не опубликована")
-    post_list = Post.objects.select_related(
-        'category'
-    ).filter(
-        category=category,
-        is_published=True,
-        pub_date__lte=timezone.now()
-    )
-    context = {
-        'post_list': post_list,
-        'category': category
-    }
-    return render(request, template, context)
+class PostDetailView(DetailView):
+    model = Post
+    template_name = "blog/detail.html"
+    context_object_name = "post"
+    pk_url_kwarg = "post_id"
+
+    def get_object(self, queryset=None):
+        obj = super().get_object(queryset)
+        if (
+            obj.pub_date > timezone.now()
+            or not obj.is_published
+            or not obj.category.is_published
+        ):
+            raise Http404("Публикация не найдена или недоступна")
+        return obj
+
+
+class CategoryPostListView(ListView):
+    model = Post
+    template_name = "blog/category.html"
+    context_object_name = "post_list"
+
+    def dispatch(self, request, *args, **kwargs):
+        self.category = get_object_or_404(
+            Category,
+            slug=self.kwargs["category_slug"]
+        )
+        if not self.category.is_published:
+            raise Http404("Категория не опубликована")
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        return (
+            queryset
+            .select_related("category")
+            .filter(
+                category=self.category,
+                is_published=True,
+                pub_date__lte=timezone.now()
+            )
+        )
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['category'] = self.category
+        return context
